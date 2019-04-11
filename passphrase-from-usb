@@ -1,0 +1,30 @@
+#!/bin/sh
+# solely inspired from https://lists.debian.org/debian-user/2015/12/msg00289.html
+set -e
+CRYPTTAB_KEYS_ROOT="__KEYS_ROOT__"  # /luks-keys
+CRYPTTAB_KEYS_DEVICE="__KEYS_DEVICE__"  # /dev/disk/by-label/USBBOOT
+CRYPTTAB_KEYS_FOLDER="__HOSTNAME__"  # $(hostname)
+CRYPTTAB_KEY="__KEY__"  # sdb_key
+CRYPTTAB_KEY_PATH="$CRYPTTAB_KEYS_ROOT/$CRYPTTAB_KEYS_FOLDER/$CRYPTTAB_KEY"  # /luks-keys/mysuperhost/mysuper.key
+CRYPTTAB_KEY_PATH_PASSDEV="$CRYPTTAB_KEYS_DEVICE:$CRYPTTAB_KEY_PATH"  # /dev/disk/by-label/USBBOOT:/luks-keys/mysuperhost/mysuper.key
+CRYPTTAB_NAME="${CRYPTTAB_NAME-}"
+CRYPTTAB_SOURCE="${CRYPTTAB_SOURCE-}"
+CRYPTTAB_KEY_FLAG="/root/$(echo $CRYPTTAB_KEY_PATH|sed -e 's![/:]!-!g')"
+if ! [ -e $CRYPTTAB_KEY_FLAG ]; then
+    touch $CRYPTTAB_KEY_FLAG
+    # unblock with a raw key path
+    if  [ -e "$CRYPTTAB_KEY_PATH" ]; then
+        echo "Unlocking $CRYPTTAB_NAME with $CRYPTTAB_KEY_PATH..." >&2
+        if ( cat "$CRYPTTAB_KEY_PATH" );then exit;fi
+    else
+        echo "Fallback to passdev with $CRYPTTAB_KEY_PATH_PASSDEV" >&2
+        # unblock with a key inside a (removable) device
+        if ( \
+            /lib/cryptsetup/scripts/passdev "$CRYPTTAB_KEY_PATH_PASSDEV" \
+            ); then
+            exit
+        fi
+    fi
+fi
+echo "Fallback to user input" >&2
+/lib/cryptsetup/askpass "Enter passphrase for decryptting $CRYPTTAB_NAME/$CRYPTTAB_SOURCE: "

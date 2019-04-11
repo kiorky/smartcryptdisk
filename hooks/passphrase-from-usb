@@ -1,0 +1,42 @@
+#!/bin/sh
+
+PREREQ=""
+KEYSCRIPT=passdev
+
+prereqs()
+{
+	echo "$PREREQ"
+}
+
+case $1 in
+prereqs)
+	prereqs
+	exit 0
+	;;
+esac
+
+. /usr/share/initramfs-tools/hook-functions
+copy_exec /sbin/password-from-usb
+# stolen from passdev hook
+# The filesystem type of the removable device is probed at boot-time, so
+# we add a generous list of filesystems to include. This also helps with
+# recovery situation as including e.g. the vfat module might help a user
+# who needs to create a new cryptkey (using a backup of a keyfile) on
+# a windows-machine for example.
+# This list needs to be kept in sync with the one defined in passdev.c
+for fs in ext4 ext3 ext2 vfat btrfs reiserfs xfs jfs ntfs iso9660 udf; do
+	manual_add_modules "$fs" >/dev/null 2>&1 || true
+done
+
+if [ ! -d "$DESTDIR/lib/cryptsetup/scripts" ]; then
+    mkdir -p "$DESTDIR/lib/cryptsetup/scripts"
+fi
+if [ -e "/lib/cryptsetup/scripts/$KEYSCRIPT" ]; then
+    copy_exec "/lib/cryptsetup/scripts/$KEYSCRIPT" /lib/cryptsetup/scripts >&2
+elif [ -e "$KEYSCRIPT" ]; then
+    copy_exec "$KEYSCRIPT" /lib/cryptsetup/scripts >&2
+else
+    echo "cryptsetup: WARNING: failed to find keyscript $KEYSCRIPT" >&2
+    continue
+fi
+exit 0
