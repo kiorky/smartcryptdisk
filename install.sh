@@ -1,6 +1,7 @@
 #!/bin/bash
 set -ex
 cd "$(dirname $0)"
+SYSTEM_KEYS_DIR=${SYSTEM_KEYS_DIR:-/etc/luks-keys}
 cp -vf passphrase-from-usb /sbin
 cp -vf hooks/* /usr/share/initramfs-tools/hooks
 KEY_HOSTNAME=${KEY_HOSTNAME:-$(hostname)}
@@ -15,7 +16,14 @@ if [ "x$MAIN_KEY" = "x" ];then
             | egrep -v "^#"|awk '{print $1}'|sed -re "s/_.*//g")
     fi
     if [ "x$device" != "x" ];then
-        MAIN_KEY="${device}_key"
+        # try to search in /etc/luks-keys for the key
+        for pretendant in "${device}_key" "${device}.key";do
+            MAIN_KEY="${pretendant}"
+            if [ -e "$SYSTEM_KEYS_DIR/$KEY_HOSTNAME/$pretendant" ];then
+                echo "Found key: $pretendant" >&2
+                break
+            fi
+        done
     fi
 fi
 if [ "x$MAIN_KEY" = "x" ];then
