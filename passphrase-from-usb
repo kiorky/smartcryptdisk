@@ -10,21 +10,33 @@ CRYPTTAB_KEY_PATH_PASSDEV="$CRYPTTAB_KEYS_DEVICE:$CRYPTTAB_KEY_PATH"  # /dev/dis
 CRYPTTAB_NAME="${CRYPTTAB_NAME-}"
 CRYPTTAB_SOURCE="${CRYPTTAB_SOURCE-}"
 CRYPTTAB_KEY_FLAG="/root/$(echo $CRYPTTAB_KEY_PATH|sed -e 's![/:]!-!g')"
+DEBUG=
 if ! [ -e $CRYPTTAB_KEY_FLAG ]; then
     touch $CRYPTTAB_KEY_FLAG
     # unblock with a raw key path
     if  [ -e "$CRYPTTAB_KEY_PATH" ]; then
         echo "Unlocking $CRYPTTAB_NAME with $CRYPTTAB_KEY_PATH..." >&2
         if ( cat "$CRYPTTAB_KEY_PATH" );then exit;fi
-    else
-        echo "Fallback to passdev with $CRYPTTAB_KEY_PATH_PASSDEV" >&2
+    fi
+    if [ -e $CRYPTTAB_KEYS_DEVICE ];then
+        echo "Trying to unlock with $CRYPTTAB_KEY_PATH_PASSDEV" >&2
         # unblock with a key inside a (removable) device
         if ( \
             /lib/cryptsetup/scripts/passdev "$CRYPTTAB_KEY_PATH_PASSDEV" \
             ); then
+            echo "Unlocking with $CRYPTTAB_KEY_PATH_PASSDEV" >&2
             exit
         fi
     fi
 fi
 echo "Fallback to user input" >&2
-/lib/cryptsetup/askpass "Enter passphrase for decryptting $CRYPTTAB_NAME/$CRYPTTAB_SOURCE: "
+# loop as input can be messed up by other services like rng
+if [ "x$DEBUG" != "x" ];then
+    while ! ( /lib/cryptsetup/askpass "Enter passphrase for decryptting TEST $CRYPTTAB_NAME/$CRYPTTAB_SOURCE: " >&2 );do
+        : loop
+    done
+fi
+# loop as input can be messed up by other services like rng
+while ! ( /lib/cryptsetup/askpass "Enter passphrase for decryptting $CRYPTTAB_NAME/$CRYPTTAB_SOURCE: " );do
+    : loop
+done
